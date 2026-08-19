@@ -28,9 +28,14 @@ button{padding:10px 14px;border:0;border-radius:8px;background:#087aa8;color:#ff
 <div><label>Número do processo</label><input id="p"></div>
 <div><label>Assunto</label><input id="a"></div>
 <div><label>Expediente / pendência</label><input id="e"></div>
+<div><label>Data de entrada</label><input id="entry" type="date"></div>
 <div><label>Prazo</label><input id="d" type="date"></div>
+<div><label>Prioridade</label><select id="priority"><option>Normal</option><option>Baixa</option><option>Alta</option><option>Urgente</option></select></div>
 <div><label>Status</label><select id="s">
 <option>Aguardando triagem</option><option>11ª DPE</option><option>Outra DPE</option><option>Ciência</option><option>Dúvida</option><option>Em andamento</option><option>Aguardando</option><option>Concluído</option>
+</select></div>
+<div><label>Situação da tarefa</label><select id="task">
+<option>Não iniciada</option><option>Em elaboração</option><option>Aguardando documento</option><option>Aguardando atendimento</option><option>Revisão</option><option>Protocolada</option><option>Concluída</option>
 </select></div>
 <div><label>Responsável</label><input id="r" placeholder="Nome do responsável"></div>
 </div>
@@ -50,6 +55,10 @@ function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function badge(s){
  let c=s==='11ª DPE'?'green':s==='Outra DPE'?'red':s==='Ciência'?'blue':s==='Dúvida'?'yellow':s==='Em andamento'?'purple':'';
  return `<span class="badge ${c}">${esc(s)}</span>`;
+}
+function badgePriority(s){
+ let c=s==='Urgente'?'red':s==='Alta'?'yellow':s==='Baixa'?'blue':'';
+ return `<span class="badge ${c}">${esc(s||'Normal')}</span>`;
 }
 
 function login(){
@@ -102,7 +111,10 @@ async function dashboard(u){
   <select id="fs" onchange="load()"><option value="">Todos os status</option>${statuses.map(x=>`<option>${x}</option>`).join('')}</select>
   <button onclick="openM()">+ Cadastrar processo</button>
  </div>
- <div class="table"><table><thead><tr><th>Processo</th><th>Assunto</th><th>Pendência</th><th>Prazo</th><th>Status</th><th>Responsável</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
+ <div class="box" style="padding:12px 16px;margin-bottom:12px;font-size:12px;color:#4b5563">
+ <b>Fluxo sugerido:</b> Triagem → definição da DPE → atribuição → execução → revisão → protocolada/concluída.
+ </div>
+ <div class="table"><table><thead><tr><th>Processo</th><th>Assunto</th><th>Pendência</th><th>Prazo</th><th>Prioridade</th><th>Status</th><th>Tarefa</th><th>Responsável</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
  load();
 }
 
@@ -112,14 +124,14 @@ async function load(){
  let query=db.from('processes').select('*').order('deadline',{ascending:true,nullsFirst:false});
  if(fs)query=query.eq('status',fs);
  const {data,error}=await query;
- if(error){document.getElementById('tb').innerHTML=`<tr><td colspan="7">Erro: ${esc(error.message)}</td></tr>`;return}
- const rows=(data||[]).filter(x=>!q||[x.process_number,x.subject,x.pending,x.notes].join(' ').toLowerCase().includes(q.toLowerCase()));
+ if(error){document.getElementById('tb').innerHTML=`<tr><td colspan="9">Erro: ${esc(error.message)}</td></tr>`;return}
+ const rows=(data||[]).filter(x=>!q||[x.process_number,x.subject,x.pending,x.notes,x.responsible_id,x.priority,x.task_status].join(' ').toLowerCase().includes(q.toLowerCase()));
  document.getElementById('tb').innerHTML=rows.map(x=>`
  <tr><td><b>${esc(x.process_number)}</b></td><td>${esc(x.subject)}</td><td>${esc(x.pending)}</td>
  <td>${x.deadline?new Date(x.deadline+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td>
- <td>${badge(x.status)}</td><td>${esc(x.responsible_id||'—')}</td>
+ <td>${badgePriority(x.priority)}</td><td>${badge(x.status)}</td><td>${esc(x.task_status||'Não iniciada')}</td><td>${esc(x.responsible_id||'—')}</td>
  <td><button class="light" onclick='openM(${JSON.stringify(x)})'>Abrir</button></td></tr>`).join('')||
- '<tr><td colspan="7" style="text-align:center;padding:35px">Nenhum processo cadastrado.</td></tr>';
+ '<tr><td colspan="9" style="text-align:center;padding:35px">Nenhum processo cadastrado.</td></tr>';
  document.getElementById('k1').textContent=data.length;
  document.getElementById('k2').textContent=data.filter(x=>x.status==='Aguardando triagem').length;
  document.getElementById('k3').textContent=data.filter(x=>x.status==='11ª DPE').length;
@@ -131,15 +143,15 @@ async function load(){
 function openM(x){
  edit=x||null;
  document.getElementById('mt').textContent=x?'Editar processo':'Cadastrar processo';
- p.value=x?.process_number||'';a.value=x?.subject||'';e.value=x?.pending||'';d.value=x?.deadline||'';
- s.value=x?.status||'Aguardando triagem';r.value=x?.responsible_id||'';n.value=x?.notes||'';
+ p.value=x?.process_number||'';a.value=x?.subject||'';e.value=x?.pending||'';entry.value=x?.entry_date||'';d.value=x?.deadline||'';
+ priority.value=x?.priority||'Normal';s.value=x?.status||'Aguardando triagem';task.value=x?.task_status||'Não iniciada';r.value=x?.responsible_id||'';n.value=x?.notes||'';
  modal.style.display='flex';
 }
 function closeM(){modal.style.display='none'}
 
 async function saveProc(){
  const {data:{user}}=await db.auth.getUser();
- const payload={process_number:p.value.trim(),subject:a.value.trim(),pending:e.value.trim(),deadline:d.value||null,status:s.value,responsible_id:r.value.trim()||null,notes:n.value.trim(),updated_at:new Date().toISOString()};
+ const payload={process_number:p.value.trim(),subject:a.value.trim(),pending:e.value.trim(),entry_date:entry.value||null,deadline:d.value||null,priority:priority.value||'Normal',status:s.value,task_status:task.value||'Não iniciada',responsible_id:r.value.trim()||null,notes:n.value.trim(),updated_at:new Date().toISOString()};
  if(!payload.process_number){alert('Informe o número do processo.');return}
  const res=edit?await db.from('processes').update(payload).eq('id',edit.id):await db.from('processes').insert({...payload,created_by:user?.id||null});
  if(res.error)alert(res.error.message);else{closeM();load()}
