@@ -37,7 +37,7 @@ button{padding:10px 14px;border:0;border-radius:8px;background:#087aa8;color:#ff
 <div><label>Situação da tarefa</label><select id="task">
 <option>Não iniciada</option><option>Em elaboração</option><option>Aguardando documento</option><option>Aguardando atendimento</option><option>Revisão</option><option>Protocolada</option><option>Concluída</option>
 </select></div>
-<div><label>Responsável</label><input id="r" placeholder="Nome do responsável"></div>
+<div><label>Responsável</label><input id="r" type="text" autocomplete="off" placeholder="Digite o nome do responsável"></div>
 </div>
 <label>Observações</label><textarea id="n" rows="4"></textarea>
 <button onclick="saveProc()">Salvar</button><button class="light" onclick="closeM()">Cancelar</button>
@@ -125,11 +125,11 @@ async function load(){
  if(fs)query=query.eq('status',fs);
  const {data,error}=await query;
  if(error){document.getElementById('tb').innerHTML=`<tr><td colspan="9">Erro: ${esc(error.message)}</td></tr>`;return}
- const rows=(data||[]).filter(x=>!q||[x.process_number,x.subject,x.pending,x.notes,x.responsible_id,x.priority,x.task_status].join(' ').toLowerCase().includes(q.toLowerCase()));
+ const rows=(data||[]).filter(x=>!q||[x.process_number,x.subject,x.pending,x.notes,x.responsible_name,x.responsible_id,x.priority,x.task_status].join(' ').toLowerCase().includes(q.toLowerCase()));
  document.getElementById('tb').innerHTML=rows.map(x=>`
  <tr><td><b>${esc(x.process_number)}</b></td><td>${esc(x.subject)}</td><td>${esc(x.pending)}</td>
  <td>${x.deadline?new Date(x.deadline+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td>
- <td>${badgePriority(x.priority)}</td><td>${badge(x.status)}</td><td>${esc(x.task_status||'Não iniciada')}</td><td>${esc(x.responsible_id||'—')}</td>
+ <td>${badgePriority(x.priority)}</td><td>${badge(x.status)}</td><td>${esc(x.task_status||'Não iniciada')}</td><td>${esc((x.responsible_name||x.responsible_id||'—'))}</td>
  <td><button class="light" onclick='openM(${JSON.stringify(x)})'>Abrir</button></td></tr>`).join('')||
  '<tr><td colspan="9" style="text-align:center;padding:35px">Nenhum processo cadastrado.</td></tr>';
  document.getElementById('k1').textContent=data.length;
@@ -144,14 +144,14 @@ function openM(x){
  edit=x||null;
  document.getElementById('mt').textContent=x?'Editar processo':'Cadastrar processo';
  p.value=x?.process_number||'';a.value=x?.subject||'';e.value=x?.pending||'';entry.value=x?.entry_date||'';d.value=x?.deadline||'';
- priority.value=x?.priority||'Normal';s.value=x?.status||'Aguardando triagem';task.value=x?.task_status||'Não iniciada';r.value=x?.responsible_id||'';n.value=x?.notes||'';
+ priority.value=x?.priority||'Normal';s.value=x?.status||'Aguardando triagem';task.value=x?.task_status||'Não iniciada';r.value=x?.responsible_name||'';n.value=x?.notes||'';
  modal.style.display='flex';
 }
 function closeM(){modal.style.display='none'}
 
 async function saveProc(){
  const {data:{user}}=await db.auth.getUser();
- const payload={process_number:p.value.trim(),subject:a.value.trim(),pending:e.value.trim(),entry_date:entry.value||null,deadline:d.value||null,priority:priority.value||'Normal',status:s.value,task_status:task.value||'Não iniciada',responsible_id:r.value.trim()||null,notes:n.value.trim(),updated_at:new Date().toISOString()};
+ const payload={process_number:p.value.trim(),subject:a.value.trim(),pending:e.value.trim(),entry_date:entry.value||null,deadline:d.value||null,priority:priority.value||'Normal',status:s.value,task_status:task.value||'Não iniciada',responsible_name:r.value.trim()||null,notes:n.value.trim(),updated_at:new Date().toISOString()};
  if(!payload.process_number){alert('Informe o número do processo.');return}
  const res=edit?await db.from('processes').update(payload).eq('id',edit.id):await db.from('processes').insert({...payload,created_by:user?.id||null});
  if(res.error)alert(res.error.message);else{closeM();load()}
