@@ -15,7 +15,7 @@ button{padding:10px 14px;border:0;border-radius:8px;background:#087aa8;color:#ff
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.toolbar input{flex:1;min-width:230px;margin:0}.toolbar select{width:auto;margin:0}
 .table{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:12px;border-bottom:1px solid #e7ebef;text-align:left;font-size:12px}th{background:#f8fafc;font-size:10px;color:#6b7280;text-transform:uppercase}
 .badge{padding:5px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#eef2f5}.green{background:#dcfce7;color:#166534}.red{background:#fee2e2;color:#991b1b}.blue{background:#dbeafe;color:#1e40af}.yellow{background:#fef3c7;color:#92400e}.purple{background:#e0e7ff;color:#3730a3}
-.modalbg{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center}.modal{width:min(720px,94%);background:#fff;border-radius:12px;padding:20px}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}.err{color:#b91c1c;font-size:12px;margin:8px 0}.archived{background:#f3f4f6;color:#4b5563}.archivebtn{background:#6b7280;color:#fff}.reactivatebtn{background:#15803d;color:#fff}
+.modalbg{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center}.modal{width:min(720px,94%);background:#fff;border-radius:12px;padding:20px}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}.err{color:#b91c1c;font-size:12px;margin:8px 0}
 @media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.twocol{grid-template-columns:1fr}}
 </style>
 </head>
@@ -31,6 +31,7 @@ button{padding:10px 14px;border:0;border-radius:8px;background:#087aa8;color:#ff
 <div><label>Data de entrada</label><input id="entry" type="date"></div>
 <div><label>Prazo</label><input id="d" type="date"></div>
 <div><label>Prioridade</label><select id="priority"><option>Normal</option><option>Baixa</option><option>Alta</option><option>Urgente</option></select></div>
+<div><label>Subcaixa no PJe</label><select id="subcaixa"><option>Sem subcaixa</option><option>Conflito - ELOISA X FRANK X JULIANA</option><option>Conflito ELOÍSA X JULIANA</option><option>Conflito FRANK X JULIANA</option><option>Conflito - GERUSA X JULIANA</option><option>Conflito RICARDO X JULIANA</option><option>Conflito TATIANA X JULIANA</option><option>Juliana Rosso</option><option>V. Infância - Conflito Layson x Juliana</option></select></div>
 <div><label>Status</label><select id="s">
 <option>Aguardando triagem</option><option>11ª DPE</option><option>Outra DPE</option><option>Ciência</option><option>Dúvida</option><option>Em andamento</option><option>Aguardando</option><option>Concluído</option>
 </select></div>
@@ -40,7 +41,7 @@ button{padding:10px 14px;border:0;border-radius:8px;background:#087aa8;color:#ff
 <div><label>Responsável</label><input id="r" type="text" autocomplete="off" placeholder="Digite o nome do responsável"></div>
 </div>
 <label>Observações</label><textarea id="n" rows="4"></textarea>
-<button onclick="saveProc()">Salvar</button><button id="archiveAction" class="archivebtn" style="display:none" onclick="toggleArchive()">Arquivar</button><button class="light" onclick="closeM()">Cancelar</button>
+<button onclick="saveProc()">Salvar</button><button class="light" onclick="closeM()">Cancelar</button>
 </div></div>
 
 <script>
@@ -48,7 +49,6 @@ const SUPABASE_URL='https://hqilkonhjpjkdosywekz.supabase.co';
 const SUPABASE_KEY='sb_publishable_DKANnEXKl96OwvbllC3HsQ_jaoKjku0';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let edit=null;
-let showArchived=false;
 
 const statuses=['Aguardando triagem','11ª DPE','Outra DPE','Ciência','Dúvida','Em andamento','Aguardando','Concluído'];
 
@@ -110,110 +110,52 @@ async function dashboard(u){
  <div class="toolbar">
   <input id="q" placeholder="Pesquisar processo, assunto ou pendência..." oninput="load()">
   <select id="fs" onchange="load()"><option value="">Todos os status</option>${statuses.map(x=>`<option>${x}</option>`).join('')}</select>
+  <select id="fsub" onchange="load()"><option value="">Todas as subcaixas</option><option>Sem subcaixa</option><option>Conflito - ELOISA X FRANK X JULIANA</option><option>Conflito ELOÍSA X JULIANA</option><option>Conflito FRANK X JULIANA</option><option>Conflito - GERUSA X JULIANA</option><option>Conflito RICARDO X JULIANA</option><option>Conflito TATIANA X JULIANA</option><option>Juliana Rosso</option><option>V. Infância - Conflito Layson x Juliana</option></select>
   <button onclick="openM()">+ Cadastrar processo</button>
-  <button class="light" onclick="toggleArchivedView()" id="archiveViewBtn">🗃️ Processos arquivados</button>
  </div>
  <div class="box" style="padding:12px 16px;margin-bottom:12px;font-size:12px;color:#4b5563">
- <b id="viewTitle">Fluxo ativo:</b> Triagem → definição da DPE → atribuição → execução → revisão → protocolada/concluída.
+ <b>Fluxo sugerido:</b> Triagem → definição da DPE → atribuição → execução → revisão → protocolada/concluída.
  </div>
- <div class="table"><table><thead><tr><th>Processo</th><th>Assunto</th><th>Pendência</th><th>Prazo</th><th>Prioridade</th><th>Status</th><th>Tarefa</th><th>Responsável</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
+ <div class="table"><table><thead><tr><th>Processo</th><th>Assunto</th><th>Subcaixa</th><th>Pendência</th><th>Prazo</th><th>Prioridade</th><th>Status</th><th>Tarefa</th><th>Responsável</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
  load();
 }
 
 async function load(){
  const q=document.getElementById('q')?.value||'';
- const fs=document.getElementById('fs')?.value||'';
- let query=db.from('processes').select('*').eq('is_archived',showArchived).order('deadline',{ascending:true,nullsFirst:false});
- if(fs)query=query.eq('status',fs);
+ const fs=document.getElementById('fs')?.value||''; const fsub=document.getElementById('fsub')?.value||'';
+ let query=db.from('processes').select('*').order('deadline',{ascending:true,nullsFirst:false});
+ if(fs)query=query.eq('status',fs); if(fsub)query=query.eq('subcaixa',fsub);
  const {data,error}=await query;
- if(error){document.getElementById('tb').innerHTML=`<tr><td colspan="9">Erro: ${esc(error.message)}</td></tr>`;return}
- const rows=(data||[]).filter(x=>!q||[x.process_number,x.subject,x.pending,x.notes,x.responsible_name,x.responsible_id,x.priority,x.task_status].join(' ').toLowerCase().includes(q.toLowerCase()));
-
- document.getElementById('viewTitle').textContent=showArchived?'Processos arquivados:':'Fluxo ativo:';
- document.getElementById('archiveViewBtn').textContent=showArchived?'← Voltar aos processos ativos':'🗃️ Processos arquivados';
-
+ if(error){document.getElementById('tb').innerHTML=`<tr><td colspan="10">Erro: ${esc(error.message)}</td></tr>`;return}
+ const rows=(data||[]).filter(x=>!q||[x.process_number,x.subject,x.subcaixa,x.pending,x.notes,x.responsible_name,x.responsible_id,x.priority,x.task_status].join(' ').toLowerCase().includes(q.toLowerCase()));
  document.getElementById('tb').innerHTML=rows.map(x=>`
- <tr><td><b>${esc(x.process_number)}</b></td><td>${esc(x.subject)}</td><td>${esc(x.pending)}</td>
+ <tr><td><b>${esc(x.process_number)}</b></td><td>${esc(x.subject)}</td><td>${esc(x.subcaixa||"Sem subcaixa")}</td><td>${esc(x.pending)}</td>
  <td>${x.deadline?new Date(x.deadline+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td>
  <td>${badgePriority(x.priority)}</td><td>${badge(x.status)}</td><td>${esc(x.task_status||'Não iniciada')}</td><td>${esc((x.responsible_name||x.responsible_id||'—'))}</td>
- <td>
-   <button class="light" onclick='openM(${JSON.stringify(x)})'>Abrir</button>
-   ${showArchived
-     ? `<button class="reactivatebtn" onclick="reactivateProc('${x.id}')">Reativar</button>`
-     : `<button class="archivebtn" onclick="archiveProc('${x.id}')">Arquivar</button>`}
- </td></tr>`).join('')||
- '<tr><td colspan="9" style="text-align:center;padding:35px">'+(showArchived?'Nenhum processo arquivado.':'Nenhum processo cadastrado.')+'</td></tr>';
-
- const {data:active,error:activeError}=await db.from('processes').select('status,deadline').eq('is_archived',false);
- if(activeError)return;
- document.getElementById('k1').textContent=active.length;
- document.getElementById('k2').textContent=active.filter(x=>x.status==='Aguardando triagem').length;
- document.getElementById('k3').textContent=active.filter(x=>x.status==='11ª DPE').length;
- document.getElementById('k4').textContent=active.filter(x=>x.status==='Outra DPE').length;
+ <td><button class="light" onclick='openM(${JSON.stringify(x)})'>Abrir</button></td></tr>`).join('')||
+ '<tr><td colspan="10" style="text-align:center;padding:35px">Nenhum processo cadastrado.</td></tr>';
+ document.getElementById('k1').textContent=data.length;
+ document.getElementById('k2').textContent=data.filter(x=>x.status==='Aguardando triagem').length;
+ document.getElementById('k3').textContent=data.filter(x=>x.status==='11ª DPE').length;
+ document.getElementById('k4').textContent=data.filter(x=>x.status==='Outra DPE').length;
  const now=new Date();now.setHours(0,0,0,0);const lim=new Date(now);lim.setDate(lim.getDate()+7);
- document.getElementById('k5').textContent=active.filter(x=>x.deadline&&new Date(x.deadline+'T00:00:00')>=now&&new Date(x.deadline+'T00:00:00')<=lim).length;
+ document.getElementById('k5').textContent=data.filter(x=>x.deadline&&new Date(x.deadline+'T00:00:00')>=now&&new Date(x.deadline+'T00:00:00')<=lim).length;
 }
-
-function toggleArchivedView(){
- showArchived=!showArchived;
- document.getElementById('fs').value='';
- load();
-}
-
-async function archiveProc(id){
- if(!confirm('Arquivar este processo? Ele sairá da lista principal, mas todos os dados serão preservados.')) return;
- const {data:{user}}=await db.auth.getUser();
- const {error}=await db.from('processes').update({
-   is_archived:true,
-   archived_at:new Date().toISOString(),
-   archived_by:user?.id||null,
-   updated_at:new Date().toISOString()
- }).eq('id',id);
- if(error) alert(error.message); else load();
-}
-
-async function reactivateProc(id){
- if(!confirm('Reativar este processo e devolvê-lo à lista principal?')) return;
- const {data:{user}}=await db.auth.getUser();
- const {error}=await db.from('processes').update({
-   is_archived:false,
-   reactivated_at:new Date().toISOString(),
-   reactivated_by:user?.id||null,
-   updated_at:new Date().toISOString()
- }).eq('id',id);
- if(error) alert(error.message); else load();
-}
-
 
 function openM(x){
  edit=x||null;
  document.getElementById('mt').textContent=x?'Editar processo':'Cadastrar processo';
  p.value=x?.process_number||'';a.value=x?.subject||'';e.value=x?.pending||'';entry.value=x?.entry_date||'';d.value=x?.deadline||'';
- priority.value=x?.priority||'Normal';s.value=x?.status||'Aguardando triagem';task.value=x?.task_status||'Não iniciada';r.value=x?.responsible_name||'';n.value=x?.notes||'';
- const ab=document.getElementById('archiveAction');
- if(x){
-   ab.style.display='inline-block';
-   ab.textContent=x.is_archived?'Reativar processo':'Arquivar processo';
-   ab.className=x.is_archived?'reactivatebtn':'archivebtn';
- }else{
-   ab.style.display='none';
- }
+ priority.value=x?.priority||'Normal';subcaixa.value=x?.subcaixa||'Sem subcaixa';s.value=x?.status||'Aguardando triagem';task.value=x?.task_status||'Não iniciada';r.value=x?.responsible_name||'';n.value=x?.notes||'';
  modal.style.display='flex';
 }
 function closeM(){modal.style.display='none'}
 
-async function toggleArchive(){
- if(!edit) return;
- closeM();
- if(edit.is_archived) await reactivateProc(edit.id);
- else await archiveProc(edit.id);
-}
-
 async function saveProc(){
  const {data:{user}}=await db.auth.getUser();
- const payload={process_number:p.value.trim(),subject:a.value.trim(),pending:e.value.trim(),entry_date:entry.value||null,deadline:d.value||null,priority:priority.value||'Normal',status:s.value,task_status:task.value||'Não iniciada',responsible_name:r.value.trim()||null,notes:n.value.trim(),updated_at:new Date().toISOString()};
+ const payload={process_number:p.value.trim(),subject:a.value.trim(),pending:e.value.trim(),entry_date:entry.value||null,deadline:d.value||null,priority:priority.value||'Normal',subcaixa:subcaixa.value||'Sem subcaixa',status:s.value,task_status:task.value||'Não iniciada',responsible_name:r.value.trim()||null,notes:n.value.trim(),updated_at:new Date().toISOString()};
  if(!payload.process_number){alert('Informe o número do processo.');return}
- const res=edit?await db.from('processes').update(payload).eq('id',edit.id):await db.from('processes').insert({...payload,created_by:user?.id||null,is_archived:false});
+ const res=edit?await db.from('processes').update(payload).eq('id',edit.id):await db.from('processes').insert({...payload,created_by:user?.id||null});
  if(res.error)alert(res.error.message);else{closeM();load()}
 }
 
